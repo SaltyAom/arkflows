@@ -1,3 +1,19 @@
+declare global {
+    interface Window {
+        __arkflows__:
+            | {
+                  version: string
+                  listener: Function
+                  process: Array<{
+                      store: any
+                      process: PurpleTeaProcess
+                      name: string
+                  }>
+              }
+            | undefined
+    }
+}
+
 type PurpleTeaEventStore = { [key: string]: PurpleTeaEvent }
 
 interface PurpleTeaEvent extends Event {
@@ -18,6 +34,7 @@ export default typeof window !== "undefined"
           event: { [key: string]: PurpleTeaEvent }
           store: { [key: string]: any }
           middleware: Function[]
+          withDevtools: boolean | undefined
 
           constructor() {
               super()
@@ -25,6 +42,7 @@ export default typeof window !== "undefined"
               this.event = {}
               this.store = {}
               this.middleware = []
+              this.withDevtools = undefined
           }
 
           /**
@@ -34,12 +52,16 @@ export default typeof window !== "undefined"
            * @param {object} initStore - Initial storage value
            * @returns {object} Storage value - Return any due to middleware.
            */
-          create<T = Object>(name: string, initStore: T): any {
+          create<T = Object>(name: string, initStore: T | {} = {}): any {
               if (typeof this.store[name] !== "undefined")
                   throw `${name} is already existed.`
 
               this.event[name] = new Event(name)
-              this.store[name] = this.useMiddleware(initStore || {}, "create")
+              this.store[name] = this.useMiddleware(
+                  initStore || {},
+                  "create",
+                  name
+              )
               return this.store[name]
           }
 
@@ -50,7 +72,9 @@ export default typeof window !== "undefined"
            */
           get(name: string): any {
               validate(name, this.event)
-              return Object.freeze(this.useMiddleware(this.store[name], "get"))
+              return Object.freeze(
+                  this.useMiddleware(this.store[name], "get", name)
+              )
           }
 
           /**
@@ -69,7 +93,7 @@ export default typeof window !== "undefined"
               let event = this.event[name]
               event.detail = value
 
-              this.store[name] = this.useMiddleware(value, "set")
+              this.store[name] = this.useMiddleware(value, "set", name)
               this.dispatchEvent(event)
               return this.store[name]
           }
@@ -95,7 +119,8 @@ export default typeof window !== "undefined"
                       ...this.store[name],
                       ...value
                   },
-                  "update"
+                  "update",
+                  name
               )
               this.dispatchEvent(event)
               return this.store[name]
@@ -111,6 +136,7 @@ export default typeof window !== "undefined"
               name: string | string[],
               callback: (value: T) => void
           ): void {
+              if (name === "*") name = [...this.list()] || []
               if (typeof name === "string") name = new Array(name)
 
               name.forEach(eachName => {
@@ -118,7 +144,11 @@ export default typeof window !== "undefined"
 
                   return this.addEventListener(eachName, () =>
                       callback(
-                          this.useMiddleware(this.store[eachName], "subscribe")
+                          this.useMiddleware(
+                              this.store[eachName],
+                              "subscribe",
+                              eachName
+                          )
                       )
                   )
               })
@@ -129,7 +159,7 @@ export default typeof window !== "undefined"
            * @returns {string} name - Store's name.
            * @returns {object} store - Store's value.
            */
-          list(): Array<keyof PurpleTea["store"]> {
+          list(): string[] {
               return Object.keys(this.store)
           }
 
@@ -155,7 +185,11 @@ export default typeof window !== "undefined"
               }> = []
               Object.entries(this.store).map(([name, store]) => {
                   storeList.push(
-                      JSON.parse(`{"name":"${name}","store":${JSON.stringify(store)}}`)
+                      JSON.parse(
+                          `{"name":"${name}","store":${JSON.stringify(
+                              this.useMiddleware(store, "get", name)
+                          )}}`
+                      )
                   )
               })
               return storeList
@@ -167,6 +201,7 @@ export default typeof window !== "undefined"
            * @callback MiddlewareCallback
            * @param store - Collection of existing store.
            * @param process - Process name which flow through middleware.
+           * @param { string } name - Store name.
            */
 
           /**
@@ -177,7 +212,8 @@ export default typeof window !== "undefined"
               ...callbacks: Array<
                   (
                       store: PurpleTea["store"],
-                      process: PurpleTeaProcess
+                      process: PurpleTeaProcess,
+                      name: string
                   ) => PurpleTea["store"]
               >
           ): void {
@@ -189,27 +225,73 @@ export default typeof window !== "undefined"
            * @private
            * @param @readonly store - Collection of existing store.
            * @param { "create" | "get" | "update" | "set" | "subscribe"} process - Process name which flow through middleware.
+           * @param {string} name - Store Name
            */
           private useMiddleware(
               store: PurpleTea["store"][keyof PurpleTea["store"]] = this.store,
-              process: PurpleTeaProcess
+              process: PurpleTeaProcess,
+              name: string
           ): any {
               let currentStore = Object.freeze(store)
               this.middleware.map(
                   runMiddleware =>
-                      (currentStore = runMiddleware(currentStore, process))
+                      (currentStore = runMiddleware(
+                          currentStore,
+                          process,
+                          name
+                      ))
               )
+
+              if (typeof window.__arkflows__ === "undefined")
+                  window.__arkflows__ = {
+                      version: "0.4.0",
+                      listener: (callback: Function = () => null) =>
+                          this.subscribe("*", () => callback()),
+                      process: []
+                  }
+
+              if (this.withDevtools && process !== "subscribe")
+                  window.__arkflows__.process.push({
+                      name: name,
+                      process: process,
+                      store: store
+                  })
+
               return currentStore
+          }
+
+          /**
+           * Enable Arkflows devtools in browser developer's tool.
+           * @param {boolean} option - Enable devtools.
+           */
+          enableDevtools(option: boolean = true) {
+              if (typeof this.withDevtools !== "undefined")
+                  throw "Devtools can only figure at once."
+              if (!option) return
+
+              window.__arkflows__ = {
+                  version: "0.4.0",
+                  listener: (callback: Function = () => null) =>
+                      this.subscribe("*", () => callback()),
+                  process: []
+              }
+
+              this.withDevtools = true
           }
       }
     : class PurpleTea {
           event: { [key: string]: PurpleTeaEvent }
           store: { [key: string]: any }
+          middleware: Function[]
+          withDevtools: boolean | undefined
 
           constructor() {
               this.event = {}
               this.store = {}
+              this.middleware = []
+              this.withDevtools = undefined
           }
+
           /**
            * Create store.
            * Create a collection of storage which can be used in various collection
@@ -217,7 +299,7 @@ export default typeof window !== "undefined"
            * @param {object} initStore - Initial storage value
            * @returns {object} Storage value
            */
-          create<T = Object>(name: string, initStore: T): any {
+          create<T = Object>(name: string, initStore: T | {} = {}): any {
               return initStore
           }
 
@@ -275,13 +357,13 @@ export default typeof window !== "undefined"
           subscribe<T = Object>(
               name: string | string[],
               callback: (value: T) => void
-          ) {}
+          ): void {}
 
           /**
            * Get every store name.
            * @returns {string[]} name - Store's name.
            */
-          list(): Array<keyof PurpleTea["store"]> {
+          list(): string[] {
               return []
           }
 
@@ -303,4 +385,33 @@ export default typeof window !== "undefined"
           }> {
               return []
           }
+
+          /**
+           * Middleware callback
+           *
+           * @callback MiddlewareCallback
+           * @param store - Collection of existing store.
+           * @param process - Process name which flow through middleware.
+           * @param { string } name - Store name.
+           */
+
+          /**
+           * Add middleware to store.
+           * @param {MiddlewareCallback} callback - Callback function to manipulate data from middleware.
+           */
+          applyMiddleware(
+              ...callbacks: Array<
+                  (
+                      store: PurpleTea["store"],
+                      process: PurpleTeaProcess,
+                      name: string
+                  ) => PurpleTea["store"]
+              >
+          ): void {}
+
+          /**
+           * Enable Arkflows devtools in browser developer's tool.
+           * @param {boolean} option - Enable devtools.
+           */
+          enableDevtools(option: boolean = true) {}
       }

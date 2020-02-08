@@ -1,12 +1,12 @@
-# Purple Tea
+# Arkflows
 Light-weight state container for JavaScript app.
   
 ## Store which doesn't hurt.
-Purple Tea is very light-weight state container for JavaScript app. It contain shared state for JavaScript create( to access on any piece of code.  
-Purple tea is inspired by Redux but with only a simple and handy logic. Under the hood, it use a simple collection of JavaScript API which supported since IE 9.
+Arkflows is very light-weight state container for JavaScript app. It contain shared state for JavaScript create( to access on any piece of code.  
+Arkflows is inspired by Redux but with only a simple and handy logic. Under the hood, it use a simple collection of JavaScript API which supported since IE 9.
   
-  Purple Tea feature:
-  * A very light-weight storage: 0.6KB (gzipped).
+  Arkflows feature:
+  * A very light-weight storage: 0.7KB (gzipped).
   * Very high performance operation.
   * Middleware support.
   * Readable error message, easier to debug.
@@ -17,7 +17,7 @@ Purple tea is inspired by Redux but with only a simple and handy logic. Under th
 
 ## Readable error
 One thing people most hate about, `unreadable error` by human. It's very annoying yet not productive to anyone.  
-Purple tea error is readable by human and suggested a way to resolve.
+Arkflows error is readable by human and suggested a way to resolve.
 ```javascript
 let tea = new Store()
 
@@ -27,11 +27,11 @@ tea.create("sugar", { amount: 0 }) // { amount: 0 }
 tea.create("sugar", { amount: 0 }) // sugar is already existed.
 ```
 ## A simple way to create store
-Purple Tea is very easy to be created, maintained, and debugged. It's just a collection of simple API under the hood.
+Arkflows is very easy to be created, maintained, and debugged. It's just a collection of simple API under the hood.
 
 ### Create Store
-Let's create a simple store with Purple Tea.  
-Purple Tea is created with class to contain reusable collection of function.
+Let's create a simple store with Arkflows.  
+Arkflows is created with class to contain reusable collection of function.
 ```javascript
 import Store from "purple-tea"
 
@@ -92,7 +92,7 @@ tea.get("sugar") // { amount: 0 }
 ```
   
 ## Subscribe to the storage
-Purple tea is able to subscribe to the storage change in real-time.
+Arkflows is able to subscribe to the storage change in real-time.
 ```javascript
 import Store from "./purple.ts"
 

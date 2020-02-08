@@ -1,7 +1,7 @@
 {
-    "name": "purple-tea",
-    "version": "0.3.1",
-    "description": "Light-speed and feather-weight state container for JavaScript app",
+    "name": "arkflows",
+    "version": "0.4.0-alpha.0",
+    "description": "Immutable state container comes in light-weight",
     "main": "index.js",
     "types": "index.d.ts",
     "license": "MIT",
