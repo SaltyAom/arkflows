@@ -135,14 +135,18 @@ export default typeof window !== "undefined"
           subscribe<T = Object>(
               name: string | string[],
               callback: (value: T) => void
-          ): void {
+          ): {
+              unsubscribe: () => void
+          } {
               if (name === "*") name = [...this.list()] || []
               if (typeof name === "string") name = new Array(name)
+
+              let events: (() => any)[] = []
 
               name.forEach(eachName => {
                   validate(eachName, this.event)
 
-                  return this.addEventListener(eachName, () =>
+                  let eventCallback = () =>
                       callback(
                           this.useMiddleware(
                               this.store[eachName],
@@ -150,8 +154,18 @@ export default typeof window !== "undefined"
                               eachName
                           )
                       )
-                  )
+
+                  events.push(eventCallback)
+
+                  return this.addEventListener(eachName, eventCallback)
               })
+
+              return {
+                  unsubscribe: () =>
+                      Object.entries(this.event).forEach(([name, _], index) =>
+                          this.removeEventListener(name, events[index])
+                      )
+              }
           }
 
           /**
@@ -357,7 +371,11 @@ export default typeof window !== "undefined"
           subscribe<T = Object>(
               name: string | string[],
               callback: (value: T) => void
-          ): void {}
+          ): {
+              unsubscribe: () => void
+          } {
+              return { unsubscribe: () => null }
+          }
 
           /**
            * Get every store name.
