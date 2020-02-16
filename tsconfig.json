@@ -58,6 +58,7 @@
     "node_modules",
     "dist",
     "test",
-    "__tests__/*.test.ts"
+    "__tests__/*.test.ts",
+    "__tests__/*.spec.ts",
   ]
 }
