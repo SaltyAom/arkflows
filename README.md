@@ -19,12 +19,12 @@ Arkflows is inspired by Redux but with only a simple and handy logic. Under the 
 One thing people most hate about, `unreadable error` by human. It's very annoying yet not productive to anyone.  
 Arkflows error is readable by human and suggested a way to resolve.
 ```javascript
-let tea = new Store()
+let store = new Store()
 
 // Create "sugar" store with initial value of { amount: 0 }
 
-tea.create("sugar", { amount: 0 }) // { amount: 0 }
-tea.create("sugar", { amount: 0 }) // sugar is already existed.
+store.create("sugar", { amount: 0 }) // { amount: 0 }
+store.create("sugar", { amount: 0 }) // sugar is already existed.
 ```
 ## A simple way to create store
 Arkflows is very easy to be created, maintained, and debugged. It's just a collection of simple API under the hood.
@@ -33,82 +33,82 @@ Arkflows is very easy to be created, maintained, and debugged. It's just a colle
 Let's create a simple store with Arkflows.  
 Arkflows is created with class to contain reusable collection of function.
 ```javascript
-import Store from "purple-tea"
+import Store from "arkflows"
 
-let tea = new Store()
+let store = new Store()
 ```
 `create()` will handle storage creation. It require `name` and `initial storage value`.
 ```javascript
-let tea = new Store()
+let store = new Store()
 
-tea.create("sugar", { amount: 0 })
+store.create("sugar", { amount: 0 })
 ```
 This will create a store name "sugar" with initial value of `{ amount: 0 }`.
   
 ### Get data
 `get()` is introduced here, to retrieve data in the storage.
 ```javascript
-let tea = new Store()
+let store = new Store()
 
-tea.create("sugar", { amount: 0 })
+store.create("sugar", { amount: 0 })
 
-tea.get("sugar")         // { amount: 0 }
-tea.get("sugar").amount  // 0
+store.get("sugar")         // { amount: 0 }
+store.get("sugar").amount  // 0
 ```
 If you get data from storage which isn't existed, it'll return error.
 ```javascript
-let tea = new Store()
+let store = new Store()
 
-tea.get("sugar") // sugar isn't existed. Please create it with create("sugar")
+store.get("sugar") // sugar isn't existed. Please create it with create("sugar")
 
-tea.create("sugar", { amount: 0 })
-tea.get("sugar") // { amount: 0 }
+store.create("sugar", { amount: 0 })
+store.get("sugar") // { amount: 0 }
 
-tea.get("salt") // salt isn't existed. Please create it with create("sugar")
+store.get("salt") // salt isn't existed. Please create it with create("sugar")
 ```
   
 ## Update store
 Mutate storage data, doesn't overwrite existed value if new value is not provided.
 ```javascript
-let tea = new Store()
+let store = new Store()
 
-tea.create("sugar", { amount: 0 })
-tea.get("sugar") // { amount: 0 }
+store.create("sugar", { amount: 0 })
+store.get("sugar") // { amount: 0 }
 
-tea.update("sugar", { amount: 1 })
-tea.get("sugar") // { amount: 1 }
+store.update("sugar", { amount: 1 })
+store.get("sugar") // { amount: 1 }
 ```
 
 ## Set store
 Overwrite a storage. Store's value will be overwriten. It take `store name` and `value`.
 ```javascript
-let tea = new Store()
+let store = new Store()
 
-tea.create("sugar", { ingredient: "sugar", amount: 0 })
-tea.get("sugar") // { ingredient: "sugar", amount: 0 }
+store.create("sugar", { ingredient: "sugar", amount: 0 })
+store.get("sugar") // { ingredient: "sugar", amount: 0 }
 
-tea.set("sugar", { amount: 0 })
-tea.get("sugar") // { amount: 0 }
+store.set("sugar", { amount: 0 })
+store.get("sugar") // { amount: 0 }
 ```
   
 ## Subscribe to the storage
 Arkflows is able to subscribe to the storage change in real-time.
 ```javascript
-import Store from "./purple.ts"
+import Store from "arkflows"
 
-let tea = new Store()
+let store = new Store()
 
-tea.create("sugar", { amount: 0 })
+store.create("sugar", { amount: 0 })
 
 // Trigger when store is updated.
-tea.subscribe("sugar", data => {
+store.subscribe("sugar", data => {
     console.log(data) // Get current value of sugar. eg. { amount: 1 }
 })
 
-tea.update("sugar", { amount: 1 })
+store.update("sugar", { amount: 1 })
 
 // Support multiple listener at once.
-tea.subscribe(["sugar", "milk"], data => {
+store.subscribe(["sugar", "milk"], data => {
     console.log(data) // Get current value of sugar. eg. { amount: 1 }
 })
 ```
@@ -119,14 +119,14 @@ Mutate store data is recommended here.
 ```javascript
 import Store from "./purple.ts"
 
-let tea = new Store()
+let store = new Store()
 
-tea.applyMiddleware((store, process) => {
+store.applyMiddleware((store, process) => {
   console.log(store, `Process: ${process}`) // { amount: 0 } Process: create(
   return store
 })
 
-tea.create("sugar", { amount: 0 })
+store.create("sugar", { amount: 0 })
 ```
 
 * list - Get every store name.

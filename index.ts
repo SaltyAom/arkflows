@@ -21,6 +21,7 @@ interface ArkflowsEvent extends Event {
 }
 
 type ArkflowsProcess = "create" | "get" | "update" | "set" | "subscribe"
+type ValueOf<T> = T[keyof T]
 
 const validate = (type: string, event: ArkflowsEventStore) => {
         if (!type) throw "type is required."
@@ -41,10 +42,11 @@ var EventTargetClass =
 
 export default !isServer
     ? class Arkflows extends EventTargetClass {
-          event: { [key: string]: ArkflowsEvent }
-          store: { [key: string]: any }
-          middleware: Function[]
-          withDevtools: boolean | undefined
+          event: Record<string, ArkflowsEvent>
+          store: Record<string, any>
+
+          private withDevtools: boolean | undefined
+          private middleware: Function[]
 
           constructor() {
               super()
@@ -62,7 +64,10 @@ export default !isServer
            * @param initStore - Initial storage value
            * @returns {object} Storage value - Return any due to middleware.
            */
-          create<T = any>(name: string, initStore: T | {} = {}): any {
+          create<T = string | number | object | {}>(
+              name: string,
+              initStore: T
+          ): T {
               if (typeof this.store[name] !== "undefined")
                   throw `${name} is already existed.`
 
@@ -81,7 +86,7 @@ export default !isServer
            * @param {string} name - Store Name
            * @returns {object} Storage value
            */
-          get(name: string): any {
+          get<T extends string>(name: T): Arkflows["store"][T] {
               validate(name, this.event)
               return Object.freeze(
                   this.useMiddleware(this.store[name], "get", name)
@@ -92,13 +97,13 @@ export default !isServer
            * Set store.
            * Overwrite a storage. Store's value will be overwriten.
            * @param {string} name - Store Name
-           * @param {object} value - Value to change or update
+           * @param {string | number | object} value - Value to change or update
            * @returns {object} Storage value
            */
-          set<T = Object>(
+          set<T>(
               name: string,
               value: T
-          ): Arkflows["store"][keyof Arkflows["store"]] {
+          ): T {
               validate(name, this.event)
 
               let event = this.event[name]
@@ -113,13 +118,13 @@ export default !isServer
            * Update store.
            * Mutate storage data, doesn't overwrite existed value if new value is not provided.
            * @param {string} name - Store Name
-           * @param value - Value to change or update
+           * @param {string | number | object} value - Value to change or update
            * @returns Storage value
            */
-          update<T = any>(
+          update<T>(
               name: string,
               value: T
-          ): Arkflows["store"][keyof Arkflows["store"]] {
+          ) : T {
               validate(name, this.event)
 
               let event = this.event[name]
@@ -136,7 +141,7 @@ export default !isServer
                   name
               )
               this.dispatchEvent(event)
-              return this.store[name]
+              return this.store[name] as T
           }
 
           /**
@@ -145,7 +150,7 @@ export default !isServer
            * @param {string|string[]} name - Store Name
            * @param {object} initStore - Initial storage value
            */
-          subscribe<T = Object>(
+          subscribe<T = string | number | object>(
               name: string | string[],
               callback: (value: T, name: string, model: any) => any
           ): {
@@ -240,7 +245,7 @@ export default !isServer
           applyMiddleware(
               ...callbacks: Array<
                   (
-                      store: Arkflows["store"],
+                      store: Arkflows["store"][keyof Arkflows["store"]],
                       process: ArkflowsProcess,
                       name: string
                   ) => any
@@ -257,7 +262,7 @@ export default !isServer
            * @param {string} name - Store Name
            */
           private useMiddleware(
-              store: Arkflows["store"][keyof Arkflows["store"]] = this.store,
+              store: Arkflows["store"][keyof Arkflows["store"]],
               process: ArkflowsProcess,
               name: string
           ): any {
@@ -313,11 +318,12 @@ export default !isServer
               this.withDevtools = true
           }
       }
-    : class Arkflows {
-          event: { [key: string]: ArkflowsEvent }
-          store: { [key: string]: any }
-          middleware: Function[]
-          withDevtools: boolean | undefined
+    : class ArkflowsServer {
+          event: Record<string, ArkflowsEvent>
+          store: Record<string, any>
+
+          private withDevtools: boolean | undefined
+          private middleware: Function[]
 
           constructor() {
               this.event = {}
@@ -333,7 +339,10 @@ export default !isServer
            * @param initStore - Initial storage value
            * @returns {object} Storage value
            */
-          create<T = any>(name: string, initStore: T | {} = {}): any {
+          create<T = string | number | object | {}>(
+              name: string,
+              initStore: T
+          ): T {
               return initStore
           }
 
@@ -342,22 +351,19 @@ export default !isServer
            * @param {string} name - Store Name
            * @returns {object} Storage value
            */
-          get(name: string): any {
-              return {}
+          get<T extends string>(name: T) {
+              return this.store[name]
           }
 
           /**
            * Set store.
            * Overwrite a storage. Store's value will be overwriten.
            * @param {string} name - Store Name
-           * @param {object} value - Value to change or update
+           * @param {string | number | object} value - Value to change or update
            * @returns {object} Storage value
            */
-          set<T = Object>(
-              name: string,
-              value: T
-          ): Arkflows["store"][keyof Arkflows["store"]] {
-              return {}
+          set<T>(name: string, value: T): T {
+              return value
           }
 
           /**
@@ -367,11 +373,8 @@ export default !isServer
            * @param value - Value to change or update
            * @returns Storage value
            */
-          update<T = any>(
-              name: string,
-              value: T
-          ): Arkflows["store"][keyof Arkflows["store"]] {
-              return {}
+          update<T>(name: string, value: T): T {
+              return value
           }
 
           /**
@@ -388,7 +391,7 @@ export default !isServer
            * @param {string|string[]} name - Store Name
            * @param {object} initStore - Initial storage value
            */
-          subscribe<T = Object>(
+          subscribe<T = string | number | object>(
               name: string | string[],
               callback: (value: T, name: string, model: any) => any
           ): {
@@ -418,8 +421,8 @@ export default !isServer
            * @returns {StoreModel[]} Store Model - Collection of store's model
            */
           model(): Array<{
-              name: keyof Arkflows["store"]
-              store: Arkflows["store"][keyof Arkflows["store"]]
+              name: keyof ArkflowsServer["store"]
+              store: ArkflowsServer["store"][keyof ArkflowsServer["store"]]
           }> {
               return []
           }
@@ -440,12 +443,12 @@ export default !isServer
           applyMiddleware(
               ...callbacks: Array<
                   (
-                      store: Arkflows["store"],
+                      store: ArkflowsServer["store"][keyof ArkflowsServer["store"]],
                       process: ArkflowsProcess,
                       name: string
                   ) => any
               >
-          ): void {}
+          ) {}
 
           /**
            * Enable Arkflows devtools in browser developer's tool.
