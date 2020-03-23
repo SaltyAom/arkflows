@@ -1,6 +1,6 @@
 {
     "name": "arkflows",
-    "version": "0.4.0-alpha.1",
+    "version": "0.4.0",
     "description": "Immutable state container comes in light-weight",
     "main": "index.js",
     "types": "index.d.ts",

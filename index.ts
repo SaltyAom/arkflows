@@ -6,7 +6,7 @@ declare global {
                   listener: Function
                   process: Array<{
                       store: any
-                      process: PurpleTeaProcess
+                      process: ArkflowsProcess
                       name: string
                   }>
               }
@@ -14,27 +14,39 @@ declare global {
     }
 }
 
-type PurpleTeaEventStore = { [key: string]: PurpleTeaEvent }
+type ArkflowsEventStore = { [key: string]: ArkflowsEvent }
 
-interface PurpleTeaEvent extends Event {
+interface ArkflowsEvent extends Event {
     detail?: any
 }
 
-type PurpleTeaProcess = "create" | "get" | "update" | "set" | "subscribe"
+type ArkflowsProcess = "create" | "get" | "update" | "set" | "subscribe"
+type ValueOf<T> = T[keyof T]
 
-const validate = (type: string, event: PurpleTeaEventStore) => {
-    if (!type) throw "type is required."
-    if (typeof type !== "string") throw "type must be string."
-    if (typeof event[type] === "undefined")
-        throw `Store: ${type} isn't existed. Please create it with create("${type}")`
-}
+const validate = (type: string, event: ArkflowsEventStore) => {
+        if (!type) throw "type is required."
+        if (typeof type !== "string") throw "type must be string."
+        if (typeof event[type] === "undefined")
+            throw `Store: ${type} isn't existed. Please create it with create("${type}")`
+    },
+    isObject = (value: any) => typeof value === "object",
+    isServer = typeof window === "undefined"
 
-export default typeof window !== "undefined"
-    ? class PurpleTea extends EventTarget {
-          event: { [key: string]: PurpleTeaEvent }
-          store: { [key: string]: any }
-          middleware: Function[]
-          withDevtools: boolean | undefined
+var EventTargetClass =
+    typeof navigator !== "undefined" &&
+    /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+        ? require("./polyfill")
+        : !isServer
+        ? class E extends EventTarget {}
+        : null
+
+export default !isServer
+    ? class Arkflows extends EventTargetClass {
+          event: Record<string, ArkflowsEvent>
+          store: Record<string, any>
+
+          private withDevtools: boolean | undefined
+          private middleware: Function[]
 
           constructor() {
               super()
@@ -49,19 +61,23 @@ export default typeof window !== "undefined"
            * Create store.
            * Create a collection of storage which can be used in various collection
            * @param {string} name - Store Name
-           * @param {object} initStore - Initial storage value
+           * @param initStore - Initial storage value
            * @returns {object} Storage value - Return any due to middleware.
            */
-          create<T = Object>(name: string, initStore: T | {} = {}): any {
+          create<T = string | number | object | {}>(
+              name: string,
+              initStore: T
+          ): T {
               if (typeof this.store[name] !== "undefined")
                   throw `${name} is already existed.`
 
               this.event[name] = new Event(name)
               this.store[name] = this.useMiddleware(
-                  initStore || {},
+                  typeof initStore !== "undefined" ? initStore : {},
                   "create",
                   name
               )
+
               return this.store[name]
           }
 
@@ -70,7 +86,7 @@ export default typeof window !== "undefined"
            * @param {string} name - Store Name
            * @returns {object} Storage value
            */
-          get(name: string): any {
+          get<T extends string>(name: T): Arkflows["store"][T] {
               validate(name, this.event)
               return Object.freeze(
                   this.useMiddleware(this.store[name], "get", name)
@@ -81,13 +97,13 @@ export default typeof window !== "undefined"
            * Set store.
            * Overwrite a storage. Store's value will be overwriten.
            * @param {string} name - Store Name
-           * @param {object} value - Value to change or update
+           * @param {string | number | object} value - Value to change or update
            * @returns {object} Storage value
            */
-          set<T = Object>(
+          set<T>(
               name: string,
               value: T
-          ): PurpleTea["store"][keyof PurpleTea["store"]] {
+          ): T {
               validate(name, this.event)
 
               let event = this.event[name]
@@ -102,28 +118,30 @@ export default typeof window !== "undefined"
            * Update store.
            * Mutate storage data, doesn't overwrite existed value if new value is not provided.
            * @param {string} name - Store Name
-           * @param {object} value - Value to change or update
-           * @returns {object} Storage value
+           * @param {string | number | object} value - Value to change or update
+           * @returns Storage value
            */
-          update<T = Object>(
+          update<T>(
               name: string,
               value: T
-          ): PurpleTea["store"][keyof PurpleTea["store"]] {
+          ) : T {
               validate(name, this.event)
 
               let event = this.event[name]
               event.detail = value
 
               this.store[name] = this.useMiddleware(
-                  {
-                      ...this.store[name],
-                      ...value
-                  },
+                  isObject(value)
+                      ? {
+                            ...this.store[name],
+                            ...value
+                        }
+                      : value,
                   "update",
                   name
               )
               this.dispatchEvent(event)
-              return this.store[name]
+              return this.store[name] as T
           }
 
           /**
@@ -132,16 +150,16 @@ export default typeof window !== "undefined"
            * @param {string|string[]} name - Store Name
            * @param {object} initStore - Initial storage value
            */
-          subscribe<T = Object>(
+          subscribe<T = string | number | object>(
               name: string | string[],
-              callback: (value: T) => void
+              callback: (value: T, name: string, model: any) => any
           ): {
               unsubscribe: () => void
           } {
               if (name === "*") name = [...this.list()] || []
               if (typeof name === "string") name = new Array(name)
 
-              let events: (() => any)[] = []
+              let events: any[] = []
 
               name.forEach(eachName => {
                   validate(eachName, this.event)
@@ -152,12 +170,14 @@ export default typeof window !== "undefined"
                               this.store[eachName],
                               "subscribe",
                               eachName
-                          )
+                          ),
+                          eachName,
+                          this.model()
                       )
 
                   events.push(eventCallback)
 
-                  return this.addEventListener(eachName, eventCallback)
+                  return this.addEventListener(eachName, () => eventCallback())
               })
 
               return {
@@ -190,12 +210,12 @@ export default typeof window !== "undefined"
            * @returns {StoreModel[]} - Collection of store's model
            */
           model(): Array<{
-              name: keyof PurpleTea["store"]
-              store: PurpleTea["store"][keyof PurpleTea["store"]]
+              name: keyof Arkflows["store"]
+              store: Arkflows["store"][keyof Arkflows["store"]]
           }> {
               let storeList: Array<{
-                  name: keyof PurpleTea["store"]
-                  store: PurpleTea["store"][keyof PurpleTea["store"]]
+                  name: keyof Arkflows["store"]
+                  store: Arkflows["store"][keyof Arkflows["store"]]
               }> = []
               Object.entries(this.store).map(([name, store]) => {
                   storeList.push(
@@ -225,10 +245,10 @@ export default typeof window !== "undefined"
           applyMiddleware(
               ...callbacks: Array<
                   (
-                      store: PurpleTea["store"],
-                      process: PurpleTeaProcess,
+                      store: Arkflows["store"][keyof Arkflows["store"]],
+                      process: ArkflowsProcess,
                       name: string
-                  ) => PurpleTea["store"]
+                  ) => any
               >
           ): void {
               callbacks.forEach(callback => this.middleware.push(callback))
@@ -242,8 +262,8 @@ export default typeof window !== "undefined"
            * @param {string} name - Store Name
            */
           private useMiddleware(
-              store: PurpleTea["store"][keyof PurpleTea["store"]] = this.store,
-              process: PurpleTeaProcess,
+              store: Arkflows["store"][keyof Arkflows["store"]],
+              process: ArkflowsProcess,
               name: string
           ): any {
               let currentStore = Object.freeze(store)
@@ -256,20 +276,23 @@ export default typeof window !== "undefined"
                       ))
               )
 
-              if (typeof window.__arkflows__ === "undefined")
+              if (
+                  this.withDevtools &&
+                  typeof window.__arkflows__ === "undefined"
+              ) {
                   window.__arkflows__ = {
                       version: "0.4.0",
-                      listener: (callback: Function = () => null) =>
-                          this.subscribe("*", () => callback()),
+                      listener: (callback: (value: any) => any) =>
+                          this.subscribe("*", store => callback(store)),
                       process: []
                   }
-
-              if (this.withDevtools && process !== "subscribe")
-                  window.__arkflows__.process.push({
-                      name: name,
-                      process: process,
-                      store: store
-                  })
+                  if (process !== "subscribe")
+                      window.__arkflows__.process.push({
+                          name: name,
+                          process: process,
+                          store: store
+                      })
+              }
 
               return currentStore
           }
@@ -286,18 +309,21 @@ export default typeof window !== "undefined"
               window.__arkflows__ = {
                   version: "0.4.0",
                   listener: (callback: Function = () => null) =>
-                      this.subscribe("*", () => callback()),
+                      this.subscribe("*", (store, name: string) =>
+                          callback(store, name, this.model())
+                      ),
                   process: []
               }
 
               this.withDevtools = true
           }
       }
-    : class PurpleTea {
-          event: { [key: string]: PurpleTeaEvent }
-          store: { [key: string]: any }
-          middleware: Function[]
-          withDevtools: boolean | undefined
+    : class ArkflowsServer {
+          event: Record<string, ArkflowsEvent>
+          store: Record<string, any>
+
+          private withDevtools: boolean | undefined
+          private middleware: Function[]
 
           constructor() {
               this.event = {}
@@ -310,10 +336,13 @@ export default typeof window !== "undefined"
            * Create store.
            * Create a collection of storage which can be used in various collection
            * @param {string} name - Store Name
-           * @param {object} initStore - Initial storage value
+           * @param initStore - Initial storage value
            * @returns {object} Storage value
            */
-          create<T = Object>(name: string, initStore: T | {} = {}): any {
+          create<T = string | number | object | {}>(
+              name: string,
+              initStore: T
+          ): T {
               return initStore
           }
 
@@ -322,36 +351,30 @@ export default typeof window !== "undefined"
            * @param {string} name - Store Name
            * @returns {object} Storage value
            */
-          get(name: string): any {
-              return {}
+          get<T extends string>(name: T) {
+              return this.store[name]
           }
 
           /**
            * Set store.
            * Overwrite a storage. Store's value will be overwriten.
            * @param {string} name - Store Name
-           * @param {object} value - Value to change or update
+           * @param {string | number | object} value - Value to change or update
            * @returns {object} Storage value
            */
-          set<T = Object>(
-              name: string,
-              value: T
-          ): PurpleTea["store"][keyof PurpleTea["store"]] {
-              return {}
+          set<T>(name: string, value: T): T {
+              return value
           }
 
           /**
            * Update store.
            * Mutate storage data, doesn't overwrite existed value if new value is not provided.
            * @param {string} name - Store Name
-           * @param {object} value - Value to change or update
-           * @returns {object} Storage value
+           * @param value - Value to change or update
+           * @returns Storage value
            */
-          update<T = Object>(
-              name: string,
-              value: T
-          ): PurpleTea["store"][keyof PurpleTea["store"]] {
-              return {}
+          update<T>(name: string, value: T): T {
+              return value
           }
 
           /**
@@ -368,9 +391,9 @@ export default typeof window !== "undefined"
            * @param {string|string[]} name - Store Name
            * @param {object} initStore - Initial storage value
            */
-          subscribe<T = Object>(
+          subscribe<T = string | number | object>(
               name: string | string[],
-              callback: (value: T) => void
+              callback: (value: T, name: string, model: any) => any
           ): {
               unsubscribe: () => void
           } {
@@ -398,8 +421,8 @@ export default typeof window !== "undefined"
            * @returns {StoreModel[]} Store Model - Collection of store's model
            */
           model(): Array<{
-              name: keyof PurpleTea["store"]
-              store: PurpleTea["store"][keyof PurpleTea["store"]]
+              name: keyof ArkflowsServer["store"]
+              store: ArkflowsServer["store"][keyof ArkflowsServer["store"]]
           }> {
               return []
           }
@@ -420,12 +443,12 @@ export default typeof window !== "undefined"
           applyMiddleware(
               ...callbacks: Array<
                   (
-                      store: PurpleTea["store"],
-                      process: PurpleTeaProcess,
+                      store: ArkflowsServer["store"][keyof ArkflowsServer["store"]],
+                      process: ArkflowsProcess,
                       name: string
-                  ) => PurpleTea["store"]
+                  ) => any
               >
-          ): void {}
+          ) {}
 
           /**
            * Enable Arkflows devtools in browser developer's tool.

@@ -1,6 +1,6 @@
 {
     "name": "arkflows",
-    "version": "0.4.0-alpha.1",
+    "version": "0.4.0",
     "description": "Immutable state container comes in light-weight",
     "license": "MIT",
     "main": "dist/",
@@ -9,8 +9,9 @@
     "scripts": {
         "test": "jest",
         "test:clearCache": "jest --clearCache",
-        "build": "yarn build:ts && yarn build:compress && yarn build:size && yarn build:info",
+        "build": "yarn build:ts && yarn build:polyfill && yarn build:compress && yarn build:size && yarn build:info",
         "build:ts": "tsc",
+        "build:polyfill": "terser polyfill.js -o dist/polyfill.js --compress --mangle",
         "build:compress": "terser dist/index.js -o dist/index.js --compress --mangle",
         "build:size": "cd dist && ls -lh",
         "build:info": "cp project/package.json dist/package.json && cp README.md dist/README.md"
@@ -21,6 +22,7 @@
         "@types/jest": "^25.1.2",
         "@types/node": "^13.7.0",
         "babel-jest": "^25.1.0",
+        "google-closure-compiler": "^20200204.0.0",
         "jest": "^25.1.0",
         "terser": "^4.6.3",
         "ts-jest": "^25.2.0",
